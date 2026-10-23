@@ -33,8 +33,8 @@ Clatter provides:
 Classical handshakes can use `NqHandshakeCore::new_prekeyed` with
 `PreGeneratedKeys` to supply caller-generated keys without storing an RNG. Supply
 fresh ephemerals for each role that uses them; see
-[`basic_no_getrandom`](examples/basic_no_getrandom.rs). `new_with_rng` accepts an
-explicit RNG instance. The existing `new` and PQ/KEM contracts are unchanged.
+[`basic_no_getrandom`](examples/basic_no_getrandom.rs). The existing `new` and
+PQ/KEM contracts are unchanged.
 
 ## Noise Protocol
 

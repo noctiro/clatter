@@ -101,32 +101,6 @@ where
     ) -> Result<NqHandshakeCore<DH, CIPHER, HASH, RNG>, HandshakeError> {
         Self::initialize(pattern, prologue, initiator, s, e, rs, re, RNG::default)
     }
-
-    /// Initialize a non-post-quantum handshake with the supplied RNG instance.
-    ///
-    /// Moves `rng` into the handshake without default-constructing or cloning it;
-    /// it is dropped if initialization fails. Key inputs and [`Rng`] bounds match
-    /// [`Self::new`].
-    ///
-    /// # Errors
-    /// As with [`Self::new`], returns [`HandshakeError::InvalidPattern`] for a
-    /// non-DH pattern or [`HandshakeError::MissingMaterial`] for absent pre-message keys.
-    ///
-    /// # Panics
-    /// As with [`Self::new`], panics if the pattern contains invalid pre-shared tokens.
-    #[allow(clippy::too_many_arguments)] // Same handshake inputs, plus the explicit RNG owner.
-    pub fn new_with_rng(
-        pattern: HandshakePattern,
-        prologue: &[u8],
-        initiator: bool,
-        s: Option<KeyPair<DH::PubKey, DH::PrivateKey>>,
-        e: Option<KeyPair<DH::PubKey, DH::PrivateKey>>,
-        rs: Option<DH::PubKey>,
-        re: Option<DH::PubKey>,
-        rng: RNG,
-    ) -> Result<Self, HandshakeError> {
-        Self::initialize(pattern, prologue, initiator, s, e, rs, re, move || rng)
-    }
 }
 
 impl<DH, CIPHER, HASH> NqHandshakeCore<DH, CIPHER, HASH, PreGeneratedKeys>
@@ -288,8 +262,7 @@ where
             initiator_pattern_index: 0,
             responder_pattern_index: 0,
             psks: ArrayVec::<[u8; PSK_LEN], MAX_PSKS>::new(),
-            // Invoke only after the original pattern/material checks, preserving `new`'s
-            // lazy default construction. Explicit RNG ownership is moved here once.
+            // Preserve validation before `new` constructs its default RNG.
             rng: make_rng(),
             psk_applied: false,
             own_randomness_applied: false,

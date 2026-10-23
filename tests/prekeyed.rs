@@ -1,6 +1,6 @@
 //! Caller-provided Noise keys with no Clatter `alloc`, `std` or `getrandom` requirement.
 //! Fixed private keys and deterministic RNG seeds below are test fixtures only.
-//! Applications must generate a fresh ephemeral keypair for each handshake attempt.
+//! Applications must generate a fresh ephemeral for each attempt whose role requires one.
 
 use clatter::bytearray::{ByteArray, SensitiveByteArray};
 use clatter::crypto::cipher::ChaChaPoly;
@@ -201,54 +201,6 @@ fn prekeyed_transcripts_match_rng_backed_handshakes() {
 }
 
 #[test]
-fn explicit_rng_instances_generate_the_expected_ephemerals_without_cloning() {
-    let seeded = |seed| FixtureRng {
-        source: StdRng::seed_from_u64(seed),
-    };
-    let alice_key = X25519::genkey_rng(&mut seeded(0xa11ce)).unwrap();
-    let bob_key = X25519::genkey_rng(&mut seeded(0xb0b)).unwrap();
-    let default_key = X25519::genkey_rng(&mut FixtureRng::default()).unwrap();
-    assert_ne!(alice_key.public, default_key.public);
-    assert_ne!(bob_key.public, default_key.public);
-
-    let mut alice = RngBacked::new_with_rng(
-        noise_nn(),
-        PROLOGUE,
-        true,
-        None,
-        None,
-        None,
-        None,
-        seeded(0xa11ce),
-    )
-    .unwrap();
-    let mut bob = RngBacked::new_with_rng(
-        noise_nn(),
-        PROLOGUE,
-        false,
-        None,
-        None,
-        None,
-        None,
-        seeded(0xb0b),
-    )
-    .unwrap();
-    let mut wire = [0; 128];
-    let mut clear = [0; 128];
-    let written = alice.write_message(&[], &mut wire).unwrap();
-    assert_eq!(&wire[..32], &alice_key.public);
-    assert_eq!(bob.read_message(&wire[..written], &mut clear).unwrap(), 0);
-    let written = bob.write_message(&[], &mut wire).unwrap();
-    assert_eq!(&wire[..32], &bob_key.public);
-    assert_eq!(alice.read_message(&wire[..written], &mut clear).unwrap(), 0);
-    assert!(alice.is_finished() && bob.is_finished());
-    assert_eq!(
-        alice.finalize().unwrap().get_handshake_hash(),
-        bob.finalize().unwrap().get_handshake_hash(),
-    );
-}
-
-#[test]
 fn prekeyed_roles_only_require_the_ephemeral_material_they_use() {
     let responder_static = keypair(0x22);
     let mut alice = Prekeyed::new_prekeyed(
@@ -305,7 +257,7 @@ fn prekeyed_roles_only_require_the_ephemeral_material_they_use() {
 }
 
 #[test]
-fn constructors_do_not_create_unused_default_rngs() {
+fn default_rng_is_created_only_after_validation() {
     DEFAULT_CALLS.with(|calls| calls.set(0));
     assert!(matches!(
         RngBacked::new(noise_pqnn(), PROLOGUE, true, None, None, None, None),
@@ -318,19 +270,5 @@ fn constructors_do_not_create_unused_default_rngs() {
     assert_eq!(DEFAULT_CALLS.with(Cell::get), 0);
 
     RngBacked::new(noise_nn(), PROLOGUE, true, None, None, None, None).unwrap();
-    assert_eq!(DEFAULT_CALLS.with(Cell::get), 1);
-    RngBacked::new_with_rng(
-        noise_nn(),
-        PROLOGUE,
-        true,
-        None,
-        None,
-        None,
-        None,
-        FixtureRng {
-            source: StdRng::seed_from_u64(0x1a2b),
-        },
-    )
-    .unwrap();
     assert_eq!(DEFAULT_CALLS.with(Cell::get), 1);
 }
